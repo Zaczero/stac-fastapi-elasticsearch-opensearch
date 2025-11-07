@@ -38,12 +38,14 @@ from stac_fastapi.sfeos_helpers.database import (
     delete_item_index_shared,
     get_queryables_mapping_shared,
     index_alias_by_collection_id,
+    index_by_collection_id,
     mk_actions,
     mk_item_id,
     populate_sort_shared,
     return_date,
     validate_refresh,
 )
+from stac_fastapi.sfeos_helpers.search_engine.selection import DatetimeBasedIndexSelector
 from stac_fastapi.sfeos_helpers.database.query import (
     ES_MAX_URL_LENGTH,
     add_collections_to_body,
@@ -1596,6 +1598,14 @@ class DatabaseLogic(BaseDatabaseLogic):
             index=COLLECTIONS_INDEX, id=collection_id, refresh=refresh
         )
         await delete_item_index(collection_id)
+
+        # Clear the @lru_cache to prevent stale values on collection recreation
+        index_alias_by_collection_id.cache_clear()
+        index_by_collection_id.cache_clear()
+
+        # Clear the IndexCacheManager if the DatetimeBasedIndexSelector singleton exists
+        if DatetimeBasedIndexSelector._instance is not None:
+            DatetimeBasedIndexSelector._instance.cache_manager.clear_cache()
 
     async def bulk_async(
         self,
